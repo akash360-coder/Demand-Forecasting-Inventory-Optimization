@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+.next/
+node_modules/
+*.log
+.pytest_cache/
+.DS_Store
+*.sqlite3
+**/.ipynb_checkpoints/
+*.db
+*.db
