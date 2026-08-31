@@ -58,6 +58,15 @@ npm run dev
 docker compose up --build
 ```
 
+## Forecasting methodology
+The forecasting layer is designed for a realistic retail demand problem with daily demand observations by product and store. The core target is `units_sold`, and the pipeline uses only information that would have been available at prediction time.
+
+- Baselines: naive, seasonal naive, and moving-average models.
+- Feature engineering: lag features (`lag_1`, `lag_7`, `lag_14`), rolling statistics, day-of-week, month, year, promotion, holiday, price, and lagged inventory indicators.
+- Validation: expanding-window time-series split using actual dates, not random train/test splitting, to avoid leakage.
+- Model comparison: Random Forest, XGBoost, and LightGBM are trained and compared using MAE, RMSE, MAPE, and WMAPE.
+- Production selection: the best model is chosen from validation performance and saved for inference.
+
 ## API examples
 ```bash
 curl "http://localhost:8000/api/v1/forecast?product_id=P101&store_id=1&forecast_horizon=14"

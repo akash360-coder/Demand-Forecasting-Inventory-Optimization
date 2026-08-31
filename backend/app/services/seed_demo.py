@@ -8,7 +8,7 @@ from src.demand_intelligence.data_generation import ensure_dataset
 
 
 def seed_demo_data(database_url: str | None = None) -> None:
-    database_module.configure_database(database_url)
+    database_module.init_db(database_url)
     db = database_module.SessionLocal()
     try:
         if db.query(Sales).count() > 0:
