@@ -42,8 +42,10 @@ def compute_model_metrics(
     feature_columns: list[str] | None = None,
     validation_frame: pd.DataFrame | None = None,
 ) -> dict[str, float]:
+    from src.demand_intelligence.forecasting import time_series_split
+    
     frame = build_feature_matrix(df).copy()
-    if len(frame) < 10:
+    if len(frame) < 45:
         return {"mae": 0.0, "rmse": 0.0, "mape": 0.0, "wmape": 0.0}
 
     columns = feature_columns or FEATURE_COLUMNS
@@ -57,17 +59,15 @@ def compute_model_metrics(
         return evaluate_predictions(actual, predicted)
 
     if model is None:
+        train, validation, test = time_series_split(frame)
         model = RandomForestRegressor(
             n_estimators=200,
             random_state=42,
             min_samples_leaf=2,
         )
-        split_index = max(1, int(len(frame) * 0.8))
-        train = frame.iloc[:split_index].copy()
-        test = frame.iloc[split_index:].copy()
         model.fit(train[columns], train["units_sold"])
-        actual = test["units_sold"].astype(float).to_numpy()
-        predicted = model.predict(test[columns])
+        actual = validation["units_sold"].astype(float).to_numpy()
+        predicted = model.predict(validation[columns])
     else:
         if "units_sold" not in df.columns:
             raise ValueError("The dataframe must include a units_sold column.")

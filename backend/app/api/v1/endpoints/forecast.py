@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse
-from app.services.forecast_service import get_dashboard_summary, get_forecast_response
+from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse, ModelPerformanceReport
+from app.services.forecast_service import get_dashboard_summary, get_forecast_response, get_model_performance_report
 
 router = APIRouter(tags=["forecast"])
 
@@ -37,3 +37,14 @@ def dashboard_endpoint() -> DashboardSummary:
         return get_dashboard_summary()
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/models/performance", response_model=ModelPerformanceReport)
+def model_performance_endpoint() -> ModelPerformanceReport:
+    """Get model performance comparison across all trained models."""
+    try:
+        report = get_model_performance_report()
+        return ModelPerformanceReport(**report)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+

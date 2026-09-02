@@ -68,6 +68,7 @@ def get_forecast_response(request: ForecastRequest) -> ForecastResponse:
             mae=float(metrics["mae"]),
             rmse=float(metrics["rmse"]),
             mape=float(metrics["mape"]),
+            wmape=float(metrics["wmape"]),
         ),
         points=[
             {
@@ -102,3 +103,50 @@ def get_dashboard_summary() -> DashboardSummary:
         },
         trend=trend,
     )
+
+
+def get_model_performance_report() -> dict:
+    """Get comprehensive model performance comparison."""
+    from datetime import datetime
+    from src.demand_intelligence.forecasting import run_experiment
+    from src.demand_intelligence.feature_engineering import FEATURE_COLUMNS
+
+    df = _load_dataframe()
+    experiment = run_experiment(df)
+
+    results = []
+    for result in experiment["results"]:
+        results.append(
+            {
+                "model_name": result["model_name"],
+                "validation_metrics": {
+                    "mae": float(result["validation_metrics"]["mae"]),
+                    "rmse": float(result["validation_metrics"]["rmse"]),
+                    "mape": float(result["validation_metrics"]["mape"]),
+                    "wmape": float(result["validation_metrics"]["wmape"]),
+                },
+                "test_metrics": {
+                    "mae": float(result["test_metrics"]["mae"]),
+                    "rmse": float(result["test_metrics"]["rmse"]),
+                    "mape": float(result["test_metrics"]["mape"]),
+                    "wmape": float(result["test_metrics"]["wmape"]),
+                },
+                "is_selected": result["model_name"] == experiment["selected_model"],
+            }
+        )
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "dataset_rows": experiment["dataset_rows"],
+        "feature_columns": FEATURE_COLUMNS,
+        "validation_strategy": experiment["validation_strategy"],
+        "selected_model": experiment["selected_model"],
+        "selected_metrics": {
+            "mae": float(experiment["selected_validation_metrics"]["mae"]),
+            "rmse": float(experiment["selected_validation_metrics"]["rmse"]),
+            "mape": float(experiment["selected_validation_metrics"]["mape"]),
+            "wmape": float(experiment["selected_validation_metrics"]["wmape"]),
+        },
+        "results": results,
+    }
+

@@ -32,6 +32,7 @@ class ForecastSummary(BaseModel):
     mae: float
     rmse: float
     mape: float
+    wmape: float = 0.0
 
 
 class ForecastResponse(BaseModel):
@@ -46,3 +47,34 @@ class DashboardSummary(BaseModel):
     recommended_reorder: float
     risk_breakdown: dict[str, float]
     trend: list[dict[str, float | str]]
+
+
+class ModelPerformanceMetrics(BaseModel):
+    """Model evaluation metrics for a specific period."""
+
+    mae: float
+    rmse: float
+    mape: float
+    wmape: float
+
+
+class ModelPerformanceResult(BaseModel):
+    """Single model's performance results."""
+
+    model_name: str
+    validation_metrics: ModelPerformanceMetrics
+    test_metrics: ModelPerformanceMetrics
+    is_selected: bool = False
+
+
+class ModelPerformanceReport(BaseModel):
+    """Complete model performance comparison report."""
+
+    timestamp: str
+    dataset_rows: int
+    feature_columns: list[str]
+    validation_strategy: str
+    selected_model: str
+    selected_metrics: ModelPerformanceMetrics
+    results: list[ModelPerformanceResult]
+
