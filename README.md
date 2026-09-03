@@ -34,6 +34,9 @@ The app answers:
 └── ...
 ```
 
+## Database configuration
+The application uses PostgreSQL as the recommended runtime database. SQLite is supported only for explicit local development by setting `DATABASE_MODE=sqlite` in the environment. The app does not silently fall back to SQLite when PostgreSQL settings are expected or partially configured.
+
 ## Data note
 This project uses a realistic, synthetic retail dataset to remain reproducible without depending on a private or unavailable business dataset. The fields `date`, `product_id`, `store_id`, `region`, `category`, and `units_sold` reflect realistic public retail demand patterns. Operational fields such as `price`, `promotion`, `holiday`, `inventory_on_hand`, and `supplier_lead_time_days` are generated to simulate a business environment for inventory optimization. This is explicitly documented in `docs/data_dictionary.md` so the distinction between real, derived, and simulated fields is clear.
 

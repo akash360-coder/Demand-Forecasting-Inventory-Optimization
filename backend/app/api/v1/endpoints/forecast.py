@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse, ModelPerformanceReport
-from app.services.forecast_service import get_dashboard_summary, get_forecast_response, get_model_performance_report
+from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse, InventoryResponse, ModelPerformanceReport
+from app.services.forecast_service import get_dashboard_summary, get_forecast_response, get_inventory_response, get_model_performance_report
 
 router = APIRouter(tags=["forecast"])
 
@@ -39,6 +39,19 @@ def dashboard_endpoint() -> DashboardSummary:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/inventory", response_model=InventoryResponse)
+def inventory_endpoint(
+    product_id: str = Query(default="P101"),
+    store_id: int = Query(default=1),
+    region: str | None = Query(default=None),
+    forecast_horizon: int = Query(default=14, ge=1, le=180),
+) -> InventoryResponse:
+    try:
+        return get_inventory_response(ForecastRequest(product_id=product_id, store_id=store_id, region=region, forecast_horizon=forecast_horizon))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/models/performance", response_model=ModelPerformanceReport)
 def model_performance_endpoint() -> ModelPerformanceReport:
     """Get model performance comparison across all trained models."""
@@ -47,4 +60,3 @@ def model_performance_endpoint() -> ModelPerformanceReport:
         return ModelPerformanceReport(**report)
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-

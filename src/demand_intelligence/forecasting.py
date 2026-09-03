@@ -12,7 +12,14 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from src.demand_intelligence.evaluation import evaluate_predictions
-from src.demand_intelligence.feature_engineering import FEATURE_COLUMNS, build_feature_matrix, detect_seasonal_period
+from src.demand_intelligence.feature_engineering import (
+    FEATURE_COLUMNS,
+    TARGET_COLUMN,
+    build_feature_matrix,
+    detect_seasonal_period,
+    validate_feature_columns,
+)
+from src.demand_intelligence.leakage_detection import validate_no_leakage
 
 try:
     from xgboost import XGBRegressor
@@ -60,6 +67,7 @@ def _make_regressor(model_name: str):
 
 
 def _fit_model(frame: pd.DataFrame, model_name: str = "Random Forest") -> Any:
+    validate_no_leakage(frame)
     model = _make_regressor(model_name)
     X = frame[FEATURE_COLUMNS]
     y = frame["units_sold"]
@@ -94,7 +102,14 @@ def moving_average_forecast(history: pd.Series, horizon: int, window: int | None
 
 
 def time_series_split(df: pd.DataFrame, validation_days: int = 30, test_days: int = 30) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    frame = df.sort_values("date").copy()
+    if "date" not in df.columns:
+        raise ValueError("Time-series split requires a date column.")
+    frame = df.copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="raise")
+    if frame["date"].isna().any():
+        raise ValueError("Time-series split cannot contain missing dates.")
+    validate_feature_columns(FEATURE_COLUMNS)
+    frame = frame.sort_values("date", kind="mergesort").copy()
     if len(frame) < 45:
         raise ValueError("At least 45 days of data are required for time-based validation.")
 
@@ -111,10 +126,10 @@ def time_series_split(df: pd.DataFrame, validation_days: int = 30, test_days: in
     test = frame[frame["date"] >= test_start].copy()
 
     if train.empty or validation.empty or test.empty:
-        split_index = int(len(frame) * 0.7)
-        train = frame.iloc[:split_index].copy()
-        validation = frame.iloc[split_index:-max(1, len(frame) // 10)].copy()
-        test = frame.iloc[-max(1, len(frame) // 10):].copy()
+        raise ValueError("Unable to create non-empty chronological train/validation/test splits.")
+
+    if not (train["date"].max() < validation["date"].min() and validation["date"].max() < test["date"].min()):
+        raise ValueError("Chronological split invariant violated: partitions overlap or are out of order.")
 
     return train, validation, test
 
@@ -249,6 +264,7 @@ def train_and_select_model(df: pd.DataFrame) -> dict[str, Any]:
 
 def generate_forecast_for_selection(df: pd.DataFrame, horizon: int = 14) -> list[dict[str, Any]]:
     frame = build_feature_matrix(df).copy()
+    validate_no_leakage(frame)
     if frame.empty:
         raise ValueError("No data available to build the forecasting model.")
 

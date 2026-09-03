@@ -49,6 +49,26 @@ class DashboardSummary(BaseModel):
     trend: list[dict[str, float | str]]
 
 
+class InventoryResponse(BaseModel):
+    product_id: str
+    store_id: int
+    current_inventory: float
+    average_daily_demand: float
+    lead_time_days: float
+    lead_time_demand: float
+    demand_std: float
+    service_level: float
+    safety_stock: float
+    reorder_point: float
+    target_inventory: float
+    recommended_order_quantity: float
+    inventory_coverage_days: float | None
+    stockout_risk: float
+    stockout_label: str
+    excess_inventory_risk: float
+    excess_label: str
+
+
 class ModelPerformanceMetrics(BaseModel):
     """Model evaluation metrics for a specific period."""
 
@@ -77,4 +97,3 @@ class ModelPerformanceReport(BaseModel):
     selected_model: str
     selected_metrics: ModelPerformanceMetrics
     results: list[ModelPerformanceResult]
-

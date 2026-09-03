@@ -6,11 +6,48 @@ import numpy as np
 import pandas as pd
 
 from src.demand_intelligence.feature_engineering import (
+    FEATURE_COLUMNS,
+    TARGET_COLUMN,
     add_lag_features,
     add_time_features,
     build_feature_matrix,
     detect_seasonal_period,
 )
+
+
+def validate_no_leakage(
+    frame: pd.DataFrame,
+    feature_columns: list[str] | None = None,
+) -> None:
+    """Validate the production feature contract before model fitting or prediction."""
+    columns = feature_columns or FEATURE_COLUMNS
+    if frame.columns.duplicated().any():
+        raise ValueError("Feature matrix contains duplicate column names.")
+    if len(columns) != len(set(columns)):
+        raise ValueError("Feature columns contain duplicates.")
+    if TARGET_COLUMN in columns:
+        raise ValueError(f"Target column {TARGET_COLUMN!r} is present in the feature matrix.")
+    if any(pd.api.types.is_datetime64_any_dtype(frame[column]) for column in columns if column in frame):
+        raise ValueError("Date-valued columns cannot be used as model features.")
+    missing = [column for column in columns if column not in frame.columns]
+    if missing:
+        raise ValueError(f"Feature matrix is missing required columns: {missing}")
+
+
+def validate_chronological_order(
+    frame: pd.DataFrame,
+    group_columns: list[str] | None = None,
+) -> None:
+    """Fail clearly when observations are not ordered within a time-series entity."""
+    groups = group_columns or ["product_id", "store_id"]
+    if "date" not in frame or any(column not in frame for column in groups):
+        raise ValueError("Chronological validation requires date and entity columns.")
+    dates = pd.to_datetime(frame["date"], errors="raise")
+    ordered = frame.assign(date=dates).groupby(groups, sort=False)["date"].apply(
+        lambda values: values.is_monotonic_increasing
+    )
+    if not ordered.all():
+        raise ValueError("Data must be chronologically ordered within each product/store group.")
 
 
 def _assert_no_leakage_in_lag_features(df: pd.DataFrame) -> bool:

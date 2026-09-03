@@ -3,8 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 from app.core import database as database_module
-from app.models import Sales
-from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse, ForecastSummary
+from app.models import Inventory, Sales
+from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResponse, ForecastSummary, InventoryResponse
 from app.services.seed_demo import seed_demo_data
 from src.demand_intelligence.data_generation import ensure_dataset
 from src.demand_intelligence.evaluation import compute_model_metrics
@@ -12,12 +12,21 @@ from src.demand_intelligence.forecasting import generate_forecast_for_selection
 from src.demand_intelligence.inventory import inventory_recommendation
 
 
-def _load_dataframe() -> pd.DataFrame:
+def _load_dataframe(product_id: str | None = None, store_id: int | None = None) -> pd.DataFrame:
     seed_demo_data()
     database_module.configure_database()
     db = database_module.SessionLocal()
     try:
-        sales = db.query(Sales).all()
+        sales_query = db.query(Sales)
+        inventory_query = db.query(Inventory)
+        if product_id is not None:
+            sales_query = sales_query.filter(Sales.product_id == product_id)
+            inventory_query = inventory_query.filter(Inventory.product_id == product_id)
+        if store_id is not None:
+            sales_query = sales_query.filter(Sales.store_id == store_id)
+            inventory_query = inventory_query.filter(Inventory.store_id == store_id)
+        sales = sales_query.all()
+        inventory = {(item.product_id, item.store_id): item for item in inventory_query.all()}
         if sales:
             rows = [
                 {
@@ -31,8 +40,8 @@ def _load_dataframe() -> pd.DataFrame:
                     "price": item.price,
                     "promotion": item.promotion,
                     "holiday": item.holiday,
-                    "inventory_on_hand": 0.0,
-                    "supplier_lead_time_days": 0.0,
+                    "inventory_on_hand": float(inventory.get((item.product_id, item.store_id)).inventory_on_hand) if (item.product_id, item.store_id) in inventory else 0.0,
+                    "supplier_lead_time_days": float(inventory.get((item.product_id, item.store_id)).lead_time_days) if (item.product_id, item.store_id) in inventory else 0.0,
                 }
                 for item in sales
             ]
@@ -44,7 +53,7 @@ def _load_dataframe() -> pd.DataFrame:
 
 
 def get_forecast_response(request: ForecastRequest) -> ForecastResponse:
-    df = _load_dataframe()
+    df = _load_dataframe(request.product_id, request.store_id)
     if request.region is not None:
         df = df[df["region"] == request.region]
     subset = df[(df["product_id"] == request.product_id) & (df["store_id"] == request.store_id)]
@@ -80,6 +89,36 @@ def get_forecast_response(request: ForecastRequest) -> ForecastResponse:
             }
             for point in forecast
         ],
+    )
+
+
+def get_inventory_response(request: ForecastRequest) -> InventoryResponse:
+    df = _load_dataframe(request.product_id, request.store_id)
+    if request.region is not None:
+        df = df[df["region"] == request.region]
+    subset = df[(df["product_id"] == request.product_id) & (df["store_id"] == request.store_id)]
+    if subset.empty:
+        raise ValueError(f"No data found for product {request.product_id} in store {request.store_id}.")
+    forecast = generate_forecast_for_selection(subset, horizon=request.forecast_horizon)
+    summary = inventory_recommendation(subset, forecast)
+    return InventoryResponse(
+        product_id=request.product_id,
+        store_id=request.store_id,
+        current_inventory=float(subset["inventory_on_hand"].iloc[-1]),
+        average_daily_demand=float(summary["average_daily_demand"]),
+        lead_time_days=float(summary["lead_time_days"]),
+        lead_time_demand=float(summary["lead_time_demand"]),
+        demand_std=float(summary["demand_std"]),
+        service_level=float(summary["service_level"]),
+        safety_stock=float(summary["safety_stock"]),
+        reorder_point=float(summary["reorder_point"]),
+        target_inventory=float(summary["target_inventory"]),
+        recommended_order_quantity=float(summary["recommended_order"]),
+        inventory_coverage_days=float(summary["inventory_coverage_days"]) if summary["inventory_coverage_days"] is not None else None,
+        stockout_risk=float(summary["stockout_risk"]),
+        stockout_label=str(summary["stockout_label"]),
+        excess_inventory_risk=float(summary["excess_inventory_risk"]),
+        excess_label=str(summary["excess_label"]),
     )
 
 
@@ -149,4 +188,3 @@ def get_model_performance_report() -> dict:
         },
         "results": results,
     }
-

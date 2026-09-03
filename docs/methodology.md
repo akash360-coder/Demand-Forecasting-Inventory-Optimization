@@ -135,6 +135,7 @@ External factors influencing demand:
 - **Leakage Check:** All features use only historical/lagged data
 - **Availability at Prediction Time:** All features can be computed for future periods
 - **Missing Value Handling:** Rows with >1 missing critical feature are dropped
+- **Production guardrails:** Feature validation rejects direct target columns, duplicate feature definitions, and date-valued model inputs. Splits are chronological and fail if partitions overlap or are empty.
 
 ---
 
@@ -517,6 +518,7 @@ db.commit()
 
 ### New Endpoints (Phase 2)
 - `GET /api/v1/models/performance` - Model comparison and selected model metrics
+- `GET /api/v1/inventory?product_id=P101&store_id=1` - Inventory optimization recommendation
 
 ### Backward Compatibility
 All Phase 1 endpoints maintained. New features added without breaking changes.
@@ -536,9 +538,26 @@ Added `wmape` to forecast summary.
 }
 ```
 
+## 15. Inventory Optimization
+
+Inventory recommendations use historical demand and the forecast without using future actual sales.
+
+- **Lead-time demand:** average forecast demand over the selected horizon multiplied by supplier lead time in days. If no forecast is available, historical average daily demand is used.
+- **Demand variability:** population standard deviation of the most recent 30 historical `units_sold` observations.
+- **Service level:** configurable probability, defaulting to 95%. The standard normal inverse CDF supplies the z-score (approximately 1.645 at 95%).
+- **Safety stock:** `z-score × demand standard deviation × sqrt(lead time days)`. It is never negative.
+- **Reorder point:** `lead-time demand + safety stock`.
+- **Target inventory:** equal to the reorder point for this continuous-review policy.
+- **Recommended order quantity:** `max(0, target inventory - current inventory)`. Open purchase orders are not assumed because they are not tracked by the current data model.
+- **Inventory coverage:** `current inventory / historical average daily demand`; it is `null` when average demand is zero.
+- **Stockout risk:** `CRITICAL` when inventory is below lead-time demand, `HIGH` when below reorder point, `MEDIUM` when below 125% of reorder point, otherwise `LOW`.
+- **Excess inventory risk:** `HIGH` at or above 150% of target, `MEDIUM` above 125%, otherwise `LOW`.
+
+For example, forecast demand of 25 units/day and a five-day lead time gives 125 units of lead-time demand. With 30 units of safety stock, target inventory and reorder point are 155 units; 80 units on hand produces a 75-unit recommendation.
+
 ---
 
-## 15. Limitations and Future Work
+## 16. Limitations and Future Work
 
 ### Current Limitations
 1. **Prediction Intervals:** Simple ±1.96σ approach; actual confidence intervals should account for model uncertainty
@@ -557,7 +576,7 @@ Added `wmape` to forecast summary.
 
 ---
 
-## 16. Testing and Quality Assurance
+## 17. Testing and Quality Assurance
 
 ### Test Coverage
 - **Data Validation:** 8 tests covering schema, missing values, duplicates, dates, demand, prices, identifiers
@@ -672,4 +691,3 @@ For questions about this methodology:
 - **Implementation:** See `src/demand_intelligence/`
 - **Tests:** See `tests/test_forecasting_phase2.py`
 - **API Documentation:** See backend `README.md`
-

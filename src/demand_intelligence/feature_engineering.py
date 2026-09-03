@@ -3,6 +3,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+TARGET_COLUMN = "units_sold"
+GROUP_COLUMNS = ["product_id", "store_id"]
+
 
 def detect_seasonal_period(df: pd.DataFrame) -> int:
     frame = df.sort_values("date").copy()
@@ -45,8 +48,12 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_lag_features(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.sort_values(["product_id", "store_id", "date"]).copy()
-    grouped = df.groupby(["product_id", "store_id"], sort=False)["units_sold"]
+    missing = set(GROUP_COLUMNS + ["date", TARGET_COLUMN, "price", "inventory_on_hand"]) - set(df.columns)
+    if missing:
+        raise ValueError(f"Cannot build time-series features; missing columns: {sorted(missing)}")
+
+    df = df.sort_values(GROUP_COLUMNS + ["date"], kind="mergesort").copy()
+    grouped = df.groupby(GROUP_COLUMNS, sort=False)[TARGET_COLUMN]
 
     for lag in [1, 7, 14, 28]:
         df[f"lag_{lag}"] = grouped.transform(lambda s: s.shift(lag))
@@ -59,11 +66,16 @@ def add_lag_features(df: pd.DataFrame) -> pd.DataFrame:
             lambda s: s.shift(1).rolling(window=window, min_periods=2).std().fillna(0.0)
         )
 
-    df["price_change"] = df.groupby(["product_id", "store_id"], sort=False)["price"].transform(
+    price_grouped = df.groupby(GROUP_COLUMNS, sort=False)["price"]
+    df["price_change"] = price_grouped.transform(
         lambda s: s.pct_change().fillna(0.0)
     )
-    df["price_index"] = df["price"] / df.groupby(["product_id", "store_id"], sort=False)["price"].transform("mean")
-    df["inventory_on_hand_lag_1"] = df.groupby(["product_id", "store_id"], sort=False)["inventory_on_hand"].transform(
+    # Compare with the historical mean available before the prediction date.
+    historical_price_mean = price_grouped.transform(
+        lambda s: s.shift(1).expanding(min_periods=1).mean()
+    )
+    df["price_index"] = df["price"] / historical_price_mean
+    df["inventory_on_hand_lag_1"] = df.groupby(GROUP_COLUMNS, sort=False)["inventory_on_hand"].transform(
         lambda s: s.shift(1).ffill().fillna(0.0)
     )
     df["inventory_coverage"] = df["inventory_on_hand_lag_1"] / (df["lag_7"].fillna(1) + 1)
@@ -99,7 +111,22 @@ def build_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
         "lead_time_days",
     ]
     valid = df.dropna(subset=required).reset_index(drop=True)
+    validate_feature_columns(FEATURE_COLUMNS)
+    if valid.columns.duplicated().any():
+        raise ValueError("Feature matrix contains duplicate column names.")
     return valid
+
+
+def validate_feature_columns(feature_columns: list[str]) -> None:
+    """Reject direct target leakage and duplicate feature definitions."""
+    if len(feature_columns) != len(set(feature_columns)):
+        raise ValueError("Feature columns must be unique.")
+    if TARGET_COLUMN in feature_columns:
+        raise ValueError(f"Target column {TARGET_COLUMN!r} cannot be used as a feature.")
+    target_aliases = {"target", "y", f"{TARGET_COLUMN}_target"}
+    aliases = target_aliases.intersection(feature_columns)
+    if aliases:
+        raise ValueError(f"Target-related columns cannot be used as features: {sorted(aliases)}")
 
 
 FEATURE_COLUMNS = [

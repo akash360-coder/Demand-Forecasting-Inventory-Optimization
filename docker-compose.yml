@@ -15,6 +15,7 @@ services:
     build:
       context: ./backend
     environment:
+      DATABASE_MODE: postgresql
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-demand_intelligence}
