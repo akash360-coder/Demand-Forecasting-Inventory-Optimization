@@ -230,7 +230,11 @@ def test_experiment_selects_based_on_wmape():
     experiment = run_experiment(df)
 
     selected_wmape = experiment["selected_validation_metrics"]["wmape"]
-    for result in experiment["results"]:
+    ml_results = [
+        result for result in experiment["results"]
+        if result["model_name"] in {"Random Forest", "XGBoost", "LightGBM"}
+    ]
+    for result in ml_results:
         assert result["validation_metrics"]["wmape"] >= selected_wmape - 1e-6
 
 
@@ -274,10 +278,10 @@ def test_seasonal_period_detection_is_reasonable_for_daily_sales():
 # ========== MODEL PERSISTENCE TESTS ==========
 
 
-def test_model_can_be_trained_and_persisted():
+def test_model_can_be_trained_and_persisted(tmp_path):
     """Verify model training and persistence."""
     df = ensure_dataset().head(300).copy()
-    artifact = train_and_select_model(df)
+    artifact = train_and_select_model(df, output_path=tmp_path / "model.joblib")
 
     assert "model_name" in artifact
     assert "model_version" in artifact
@@ -285,10 +289,12 @@ def test_model_can_be_trained_and_persisted():
     assert "metrics" in artifact
 
 
-def test_model_can_be_loaded_after_persistence():
+def test_model_can_be_loaded_after_persistence(tmp_path, monkeypatch):
     """Verify trained model can be loaded."""
     df = ensure_dataset().head(300).copy()
-    train_and_select_model(df)
+    output_path = tmp_path / "model.joblib"
+    monkeypatch.setattr("src.demand_intelligence.forecasting.PRODUCTION_MODEL_PATH", output_path)
+    train_and_select_model(df, output_path=output_path)
 
     loaded = load_production_model()
     assert loaded is not None
@@ -296,10 +302,12 @@ def test_model_can_be_loaded_after_persistence():
     assert "model_name" in loaded
 
 
-def test_loaded_model_produces_valid_predictions():
+def test_loaded_model_produces_valid_predictions(tmp_path, monkeypatch):
     """Verify loaded model produces valid predictions."""
     df = ensure_dataset().head(300).copy()
-    train_and_select_model(df)
+    output_path = tmp_path / "model.joblib"
+    monkeypatch.setattr("src.demand_intelligence.forecasting.PRODUCTION_MODEL_PATH", output_path)
+    train_and_select_model(df, output_path=output_path)
     loaded = load_production_model()
     forecast = generate_forecast_for_selection(df, horizon=7)
 
@@ -380,4 +388,3 @@ def test_full_pipeline_runs_without_errors():
 
     forecast = generate_forecast_for_selection(df, horizon=7)
     assert len(forecast) == 7
-

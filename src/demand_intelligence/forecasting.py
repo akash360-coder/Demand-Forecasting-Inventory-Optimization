@@ -204,7 +204,13 @@ def run_experiment(df: pd.DataFrame) -> dict[str, Any]:
             }
         )
 
-    selected = min(results, key=lambda item: item["validation_metrics"]["wmape"])
+    ml_results = [
+        item for item in results
+        if item["model_name"] in {"Random Forest", "XGBoost", "LightGBM"}
+    ]
+    if not ml_results:
+        raise ValueError("No feature-based model was available for production selection.")
+    selected = min(ml_results, key=lambda item: item["validation_metrics"]["wmape"])
     return {
         "dataset_rows": len(frame),
         "feature_columns": FEATURE_COLUMNS,
@@ -216,7 +222,13 @@ def run_experiment(df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def _persist_model(model: Any, feature_columns: list[str], model_name: str, metrics: dict[str, float]) -> dict[str, Any]:
+def _persist_model(
+    model: Any,
+    feature_columns: list[str],
+    model_name: str,
+    metrics: dict[str, float],
+    output_path: Path | None = None,
+) -> dict[str, Any]:
     model_version = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     payload = {
         "model_name": model_name,
@@ -226,8 +238,9 @@ def _persist_model(model: Any, feature_columns: list[str], model_name: str, metr
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "model": model,
     }
-    PRODUCTION_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(payload, PRODUCTION_MODEL_PATH)
+    destination = output_path or PRODUCTION_MODEL_PATH
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(payload, destination)
     return payload
 
 
@@ -237,7 +250,7 @@ def load_production_model() -> dict[str, Any]:
     return joblib.load(PRODUCTION_MODEL_PATH)
 
 
-def train_and_select_model(df: pd.DataFrame) -> dict[str, Any]:
+def train_and_select_model(df: pd.DataFrame, output_path: Path | None = None) -> dict[str, Any]:
     experiment = run_experiment(df)
     selected_name = experiment["selected_model"]
 
@@ -251,12 +264,12 @@ def train_and_select_model(df: pd.DataFrame) -> dict[str, Any]:
             "model": selected_name,
             "baseline": True,
         }
-        return _persist_model(artifact["model"], artifact["feature_columns"], selected_name, artifact["metrics"])
+        return _persist_model(artifact["model"], artifact["feature_columns"], selected_name, artifact["metrics"], output_path)
 
     frame = build_feature_matrix(df).copy()
     train, _, _ = time_series_split(frame)
     model = _fit_model(train, selected_name)
-    artifact = _persist_model(model, FEATURE_COLUMNS, selected_name, experiment["selected_validation_metrics"])
+    artifact = _persist_model(model, FEATURE_COLUMNS, selected_name, experiment["selected_validation_metrics"], output_path)
     artifact["selected_model"] = selected_name
     artifact["experiment"] = experiment
     return artifact

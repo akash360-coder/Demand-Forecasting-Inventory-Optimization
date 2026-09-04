@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-09-03T14:58:16.053856",
+  "dataset": {
+    "total_rows": 105120,
+    "valid_rows": 105120,
+    "removed_rows": 0,
+    "products": 18,
+    "stores": 8,
+    "date_range": {
+      "start": "2023-01-01 00:00:00",
+      "end": "2024-12-30 00:00:00"
+    }
+  },
+  "validation": {
+    "total_issues": 2,
+    "critical_issues": 0,
+    "warnings": 1
+  },
+  "feature_engineering": {
+    "total_features": 18,
+    "feature_list": [
+      "lag_1",
+      "lag_7",
+      "lag_14",
+      "rolling_mean_7",
+      "rolling_mean_14",
+      "rolling_std_7",
+      "day_of_week",
+      "month",
+      "week_of_year",
+      "day_of_year",
+      "quarter",
+      "is_weekend",
+      "promotion",
+      "holiday",
+      "price",
+      "price_change",
+      "inventory_on_hand_lag_1",
+      "lead_time_days"
+    ]
+  },
+  "experiment": {
+    "strategy": "expanding-window time-series split",
+    "models_evaluated": 6,
+    "selected_model": "LightGBM"
+  },
+  "metrics": {
+    "validation": {
+      "mae": 23.67145606645952,
+      "rmse": 33.64140155181645,
+      "mape": 16.322771635638123,
+      "wmape": 15.678167418747307
+    },
+    "test": {
+      "mae": 25.481145203761532,
+      "rmse": 36.78980478568668,
+      "mape": 16.73791089329924,
+      "wmape": 16.15621506847404
+    }
+  },
+  "model": {
+    "name": "LightGBM",
+    "version": "20260904T134151Z",
+    "trained_at": "2026-09-04T13:41:51.619225+00:00"
+  }
+}

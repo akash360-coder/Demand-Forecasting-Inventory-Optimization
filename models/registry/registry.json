@@ -1,0 +1,46 @@
+[
+  {
+    "model_id": "lightgbm-20260904T134151Z",
+    "model_name": "LightGBM",
+    "model_type": "LGBMRegressor",
+    "model_version": "20260904T134151Z",
+    "artifact_path": "E:\\MY DATA\\Desktop\\Demand Forecasting & Inventory Optimization\\models\\production_forecast_model.joblib",
+    "created_at": "2026-09-04T13:41:51.619225+00:00",
+    "feature_count": 18,
+    "feature_names": [
+      "lag_1",
+      "lag_7",
+      "lag_14",
+      "rolling_mean_7",
+      "rolling_mean_14",
+      "rolling_std_7",
+      "day_of_week",
+      "month",
+      "week_of_year",
+      "day_of_year",
+      "quarter",
+      "is_weekend",
+      "promotion",
+      "holiday",
+      "price",
+      "price_change",
+      "inventory_on_hand_lag_1",
+      "lead_time_days"
+    ],
+    "target_name": "units_sold",
+    "metrics": {
+      "mae": 23.67145606645952,
+      "rmse": 33.64140155181645,
+      "mape": 16.322771635638123,
+      "wmape": 15.678167418747307
+    },
+    "status": "production",
+    "is_champion": true,
+    "is_production": true,
+    "parent_model_version": null,
+    "training_run_id": "train_20260904T134151Z",
+    "metadata": {
+      "artifact_sha256": "e097de164052e3997436647d9ed97899914c5b88a28f7b3673d17b6bd8049ef3"
+    }
+  }
+]
