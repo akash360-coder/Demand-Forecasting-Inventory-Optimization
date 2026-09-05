@@ -58,6 +58,7 @@
       "wmape": 16.15621506847404
     }
   },
+  "training_run_id": "train_20260904T134151Z",
   "model": {
     "name": "LightGBM",
     "version": "20260904T134151Z",

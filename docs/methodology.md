@@ -1,8 +1,26 @@
 # Demand Forecasting Methodology
 
+## Forecast Accuracy Intelligence
+
+Forecast error is `forecast - actual`. MAE, RMSE, MAPE, and WMAPE reuse the project's metric conventions; zero-demand observations are handled without division errors. Bias is signed `sum(forecast - actual) / sum(actual)`, so positive values indicate over-forecasting and negative values indicate under-forecasting. Results are segmented by product, store, category, region, and day/week/month. Seven observations is the default business reporting threshold. Error analysis describes model performance but does not prove causal business impact or monetary loss.
+
 ## Executive Summary
 
 This document describes the professional demand forecasting pipeline implemented as part of this project. The pipeline follows industry best practices for time-series forecasting in retail inventory optimization, with strict emphasis on preventing data leakage and maintaining production-ready code standards.
+
+## Inventory Intelligence Methodology
+
+The inventory intelligence layer is a decision-support analytics layer layered on top of the demand forecast. It is not a substitute for a production inventory policy or financial forecast.
+
+- **ABC segmentation:** products are ranked by cumulative business value; A, B, and C segments are assigned from the cumulative share of total value.
+- **XYZ segmentation:** coefficient of variation is computed per product using historical daily demand; low, medium, and high variability correspond to X, Y, and Z classes.
+- **ABC-XYZ matrix:** the combined value and variability frame highlights products that are both valuable and predictable versus those that are volatile or lower priority.
+- **Inventory health score:** stockout risk, excess risk, coverage, forecast variability, and lead-time conditions are aggregated into a 0-100 score across health bands from Excellent to Critical.
+- **Stockout risk and excess inventory:** operational risk bands are calculated from current inventory cover, forecast variability, and current coverage versus target thresholds.
+- **Opportunity ranking:** candidate actions are prioritized based on urgency, stock risk, excess exposure, and business value impact.
+- **Service-level analytics:** the tool compares 90%, 95%, 98%, and 99% target service levels to derive the resulting safety stock, reorder point, and suggested order quantities.
+
+The analytics may be filtered by product, store, category, region, ABC class, XYZ class, risk level, health band, and service-level target. Output is intended to support operational review and replenishment planning, not to guarantee future outcomes.
 
 ---
 
@@ -518,6 +536,11 @@ db.commit()
 
 ### New Endpoints (Phase 2)
 - `GET /api/v1/models/performance` - Model comparison and selected model metrics
+
+### Explainability (Phase 3)
+`GET /api/v1/explain` provides local SHAP explanations for supported tree-based production models. Positive SHAP values increase the prediction relative to the model baseline; negative values decrease it. The response returns the five features with the largest absolute contributions. These values describe model behavior, not causal effects.
+
+The currently persisted production artifact is a LightGBM regressor selected by measured validation WMAPE. It is explained with real SHAP contributions; no synthetic values are used.
 - `GET /api/v1/inventory?product_id=P101&store_id=1` - Inventory optimization recommendation
 
 ### Backward Compatibility
@@ -691,3 +714,36 @@ For questions about this methodology:
 - **Implementation:** See `src/demand_intelligence/`
 - **Tests:** See `tests/test_forecasting_phase2.py`
 - **API Documentation:** See backend `README.md`
+## What-if simulation
+
+The simulator preserves the historical feature context, overrides only the
+requested business assumptions, and recursively predicts each future day with
+the persisted production artifact. It compares those predictions with a
+baseline using the latest observed price, promotion, holiday, lead time, and
+inventory values. Inventory metrics reuse the documented 95% service-level
+formulas and the existing risk classifications. Scenario explanations are
+computed with the same tree-model SHAP implementation as normal explanations;
+no synthetic predictions or explanations are used. Open purchase orders are
+outside the current data model.
+
+## Model monitoring
+
+Monitoring uses the earliest 80% of available historical data as a deterministic
+reference window and the selected/current window as monitoring data. Quality
+checks report missing and non-finite values, duplicates, invalid business
+values, row/column counts, and date coverage without silently dropping records.
+Numeric and binary distributions use PSI with 0.10 and 0.25 warning/critical
+conventions. Target and prediction shifts are reported as distribution drift,
+not proof of concept drift. When actual demand is available, current MAE, RMSE,
+MAPE, and WMAPE are compared with persisted reference metrics.
+
+## Model registry and retraining
+
+Every training run receives a UTC model version and `training_run_id`. The
+registry stores model metadata, feature contract, metrics, status, and an
+artifact hash. Retraining is synchronous and explicitly triggered through the
+API; it evaluates a challenger against the current champion using WMAPE as the
+primary metric and requires at least 1% relative improvement by default.
+Incompatible, non-finite, or insufficiently improved challengers are rejected
+and the champion artifact is restored. Distribution drift produces a
+retraining recommendation signal, not automatic retraining.

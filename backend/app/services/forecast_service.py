@@ -8,7 +8,10 @@ from app.schemas.forecast import DashboardSummary, ForecastRequest, ForecastResp
 from app.services.seed_demo import seed_demo_data
 from src.demand_intelligence.data_generation import ensure_dataset
 from src.demand_intelligence.evaluation import compute_model_metrics
+from src.demand_intelligence.explainability import explain_model
+from src.demand_intelligence.feature_engineering import FEATURE_COLUMNS, build_feature_matrix
 from src.demand_intelligence.forecasting import generate_forecast_for_selection
+from src.demand_intelligence.forecasting import load_production_model
 from src.demand_intelligence.inventory import inventory_recommendation
 
 
@@ -120,6 +123,31 @@ def get_inventory_response(request: ForecastRequest) -> InventoryResponse:
         excess_inventory_risk=float(summary["excess_inventory_risk"]),
         excess_label=str(summary["excess_label"]),
     )
+
+
+def get_explanation_response(request: ForecastRequest) -> dict:
+    df = _load_dataframe(request.product_id, request.store_id)
+    if request.region is not None:
+        df = df[df["region"] == request.region]
+    subset = df[(df["product_id"] == request.product_id) & (df["store_id"] == request.store_id)]
+    if subset.empty:
+        raise ValueError(f"No data found for product {request.product_id} in store {request.store_id}.")
+    frame = build_feature_matrix(subset)
+    if frame.empty:
+        raise ValueError("No valid feature row is available for explanation.")
+    artifact = load_production_model()
+    explanation = explain_model(
+        artifact.get("model"),
+        frame[FEATURE_COLUMNS].tail(1),
+        artifact.get("feature_columns", FEATURE_COLUMNS),
+    )
+    return {
+        "product_id": request.product_id,
+        "store_id": request.store_id,
+        "prediction": explanation["prediction"],
+        "top_features": [item.__dict__ for item in explanation["features"]],
+        "summary": explanation["summary"],
+    }
 
 
 def get_dashboard_summary() -> DashboardSummary:
