@@ -57,6 +57,36 @@ def _all_types_for(rows: list[dict[str, Any]]) -> dict[str, int]:
     return distribution
 
 
+def _empty_inventory_response() -> InventoryIntelligenceResponse:
+    return InventoryIntelligenceResponse(
+        summary=InventoryIntelligenceSummary(
+            total_products=0,
+            total_stores=0,
+            total_inventory_units=0.0,
+            stockout_risk_count=0,
+            excess_inventory_count=0,
+            critical_inventory_count=0,
+            average_health_score=0.0,
+            abc_distribution={},
+            xyz_distribution={},
+            abc_xyz_distribution={},
+        ),
+        inventory_health=InventoryHealthSummary(
+            average_score=0.0,
+            health_band_counts={"Excellent": 0, "Healthy": 0, "Watch": 0, "Risk": 0, "Critical": 0},
+            top_critical_products=[],
+        ),
+        risk=InventoryRiskSummary(
+            stockout_risk_distribution={},
+            excess_inventory_distribution={},
+            risk_matrix_data={"aggregate": {"total_records": 0, "healthy": 0, "watch": 0, "risk": 0, "high_stockout": 0, "excess_inventory": 0}, "details": []},
+        ),
+        abc_xyz=[],
+        opportunities=[],
+        service_level=[],
+    )
+
+
 def get_inventory_intelligence_response(
     product_id: str | None = None,
     store_id: int | None = None,
@@ -71,6 +101,13 @@ def get_inventory_intelligence_response(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> InventoryIntelligenceResponse:
+    if abc_class is not None and str(abc_class).upper() not in {"A", "B", "C"}:
+        raise ValueError("abc_class must be one of A, B, or C.")
+    if xyz_class is not None and str(xyz_class).upper() not in {"X", "Y", "Z"}:
+        raise ValueError("xyz_class must be one of X, Y, or Z.")
+    if risk_level is not None and str(risk_level).title() not in {"Low", "Medium", "High", "Critical"}:
+        raise ValueError("risk_level must be one of Low, Medium, High, or Critical.")
+
     frame = _load_dataframe(product_id, store_id).copy()
     if category is not None:
         frame = frame[frame["category"].astype(str).str.lower() == str(category).lower()]
@@ -81,7 +118,7 @@ def get_inventory_intelligence_response(
     if end_date:
         frame = frame[frame["date"] <= pd.Timestamp(end_date)]
     if frame.empty:
-        raise ValueError("No data found for the requested inventory intelligence filters.")
+        return _empty_inventory_response()
     if service_level is None:
         service_level = 0.95
     if not 0 < float(service_level) < 1:
@@ -95,7 +132,7 @@ def get_inventory_intelligence_response(
 
     row_frame = build_inventory_intelligence_dataframe(frame, service_level=float(service_level)).copy()
     if row_frame.empty:
-        raise ValueError("Inventory analytics cannot be computed from empty filtered data.")
+        return _empty_inventory_response()
 
     for field in ["current_inventory", "lead_time_days", "lead_time_demand", "reorder_point", "target_inventory", "recommended_order", "stockout_risk_score", "excess_inventory_units", "excess_inventory_percentage", "inventory_coverage", "health_score"]:
         row_frame[field] = pd.to_numeric(row_frame[field], errors="coerce").fillna(0.0)
@@ -134,7 +171,7 @@ def get_inventory_intelligence_response(
         row_frame = row_frame[row_frame["health_band"].astype(str).str.upper() == str(health_band).upper()]
 
     if row_frame.empty:
-        raise ValueError("The selected inventory intelligence filters produce no results.")
+        return _empty_inventory_response()
 
     stockout_distribution = _distribution_from_values(row_frame["stockout_risk_level"].astype(str).tolist())
     excess_distribution = _distribution_from_values(row_frame["excess_risk_level"].astype(str).tolist())

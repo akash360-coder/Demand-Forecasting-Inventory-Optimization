@@ -274,27 +274,32 @@ def test_inventory_intelligence_api_store_filter():
 
 def test_inventory_intelligence_api_abc_filter():
     response = client.get("/api/v1/analytics/inventory-intelligence", params={"abc_class": "A"})
-    assert response.status_code in {200, 400}
+    assert response.status_code == 200
 
 
 def test_inventory_intelligence_api_xyz_filter():
     response = client.get("/api/v1/analytics/inventory-intelligence", params={"xyz_class": "X"})
-    assert response.status_code in {200, 400}
+    assert response.status_code == 200
 
 
 def test_inventory_intelligence_api_risk_filter():
     response = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "Low"})
-    assert response.status_code in {200, 400}
+    assert response.status_code == 200
 
 
 def test_inventory_intelligence_api_invalid_filters():
-    response = client.get("/api/v1/analytics/inventory-intelligence", params={"service_level": 1.5})
-    assert response.status_code == 422
+    invalid_xyz = client.get("/api/v1/analytics/inventory-intelligence", params={"xyz_class": "INVALID"})
+    invalid_risk = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "INVALID"})
+    invalid_service_level = client.get("/api/v1/analytics/inventory-intelligence", params={"service_level": 1.5})
+    assert invalid_xyz.status_code == 400
+    assert invalid_risk.status_code == 400
+    assert invalid_service_level.status_code == 422
 
 
 def test_inventory_intelligence_api_empty_result():
     response = client.get("/api/v1/analytics/inventory-intelligence", params={"product_id": "NO_SUCH_PRODUCT"})
-    assert response.status_code == 400
+    assert response.status_code == 200
+    assert response.json()["summary"]["total_products"] == 0
 
 
 def test_inventory_intelligence_response_schema():
