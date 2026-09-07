@@ -282,17 +282,52 @@ def test_inventory_intelligence_api_xyz_filter():
     assert response.status_code == 200
 
 
+def test_inventory_intelligence_api_xyz_y_filter():
+    response = client.get("/api/v1/analytics/inventory-intelligence", params={"xyz_class": "Y"})
+    assert response.status_code == 200
+
+
+def test_inventory_intelligence_api_xyz_z_filter():
+    response = client.get("/api/v1/analytics/inventory-intelligence", params={"xyz_class": "Z"})
+    assert response.status_code == 200
+
+
 def test_inventory_intelligence_api_risk_filter():
     response = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "Low"})
+    assert response.status_code == 200
+
+
+def test_inventory_intelligence_api_risk_medium_filter():
+    response = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "Medium"})
+    assert response.status_code == 200
+
+
+def test_inventory_intelligence_api_risk_high_filter():
+    response = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "High"})
+    assert response.status_code == 200
+
+
+def test_inventory_intelligence_api_risk_critical_filter():
+    response = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "Critical"})
+    assert response.status_code == 200
+
+
+def test_inventory_intelligence_api_combined_filters():
+    response = client.get(
+        "/api/v1/analytics/inventory-intelligence",
+        params={"product_id": "P100", "store_id": 1, "abc_class": "A", "xyz_class": "X", "risk_level": "Low"},
+    )
     assert response.status_code == 200
 
 
 def test_inventory_intelligence_api_invalid_filters():
     invalid_xyz = client.get("/api/v1/analytics/inventory-intelligence", params={"xyz_class": "INVALID"})
     invalid_risk = client.get("/api/v1/analytics/inventory-intelligence", params={"risk_level": "INVALID"})
+    invalid_abc = client.get("/api/v1/analytics/inventory-intelligence", params={"abc_class": "INVALID"})
     invalid_service_level = client.get("/api/v1/analytics/inventory-intelligence", params={"service_level": 1.5})
     assert invalid_xyz.status_code == 400
     assert invalid_risk.status_code == 400
+    assert invalid_abc.status_code == 400
     assert invalid_service_level.status_code == 422
 
 
